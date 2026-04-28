@@ -13,16 +13,31 @@ public class BouncyShoot : MonoBehaviour
 
     	public static readonly Color colorZero = Color.clear;
         public static List<BallClass> balls;
+
+        public GameObject BallInstYesPrefab;
+        public GameObject BallInstNoPrefab;
+
+        public GameObject spherePrefab;
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
         	balls = new List<BallClass>();
+            BallInstYesPrefab = spherePrefab;
     }
 
     // Update is called once per frame
     void Update()
     {
-        
+        if (Input.GetKeyDown(KeyCode.F))
+		{
+            ballFire(this.gameObject, Vector3.zero, colorZero);
+			// if (!ballOnCool)
+			// {
+				
+			// 	StartCoroutine(ballCD(Static.ballCoolTime));
+			// }
+		}
     }
 
 

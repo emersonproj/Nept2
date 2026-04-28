@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 92673766515538775}
   - component: {fileID: 1095953489317753262}
   m_Layer: 0
-  m_Name: BallInstPrefab
+  m_Name: BallInstYesPrefab
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
