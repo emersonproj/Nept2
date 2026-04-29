@@ -6,6 +6,8 @@ using DefaultNamespace;
 using JetBrains.Annotations;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using UnityEngine.InputSystem;
+using Unity.VisualScripting;
 
 public class BouncyShoot : MonoBehaviour
 {
@@ -29,18 +31,34 @@ public class BouncyShoot : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.F))
-		{
-            ballFire(this.gameObject, Vector3.zero, colorZero);
+
+        if (Keyboard.current.fKey.wasPressedThisFrame)
+            {
+                ballFire(this.gameObject, Vector3.zero, colorZero);
+            }
+ 
 			// if (!ballOnCool)
 			// {
 				
 			// 	StartCoroutine(ballCD(Static.ballCoolTime));
 			// }
-		}
+        
     }
 
 
+    void FixedUpdate()
+    {
+        addBallForces();
+    }
+
+	public void addBallForces()
+	{
+		foreach (BallClass ball in balls)
+		{
+			ball.rB.AddForce(ball.totalForceToAdd);
+			ball.totalForceToAdd = Vector3.zero;
+		}
+	}
 
 
 

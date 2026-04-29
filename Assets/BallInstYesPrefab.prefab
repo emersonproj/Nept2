@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 7681476617590924954}
   - component: {fileID: 92673766515538775}
   - component: {fileID: 1095953489317753262}
+  - component: {fileID: -2627414880113190413}
   m_Layer: 0
   m_Name: BallInstYesPrefab
   m_TagString: Untagged
@@ -125,3 +126,30 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 07d02042f21ea40899376872bd81b8ec, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BallScript
+--- !u!54 &-2627414880113190413
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6954357075162129829}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 0
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
