@@ -21,6 +21,8 @@ public class BouncyShoot : MonoBehaviour
 
         public GameObject spherePrefab;
 
+        private bool ballOnCool;
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -31,10 +33,16 @@ public class BouncyShoot : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-
-        if (Keyboard.current.fKey.wasPressedThisFrame)
+        // next: figure out how to do "is currently pressed down"
+        if (Keyboard.current.fKey.wa)
             {
-                ballFire(this.gameObject, Vector3.zero, colorZero);
+
+
+                if (!ballOnCool)
+			    {
+				
+				StartCoroutine(ballCD(Static.ballCoolTime));
+			    }
             }
  
 			// if (!ballOnCool)
@@ -122,5 +130,15 @@ public class BouncyShoot : MonoBehaviour
 
 		return ballClass;
 
+	}
+
+
+
+    	public IEnumerator ballCD(float cdTime)
+	{
+		ballOnCool = true;
+		ballFire(this.gameObject, Vector3.zero, colorZero);
+		yield return new WaitForSeconds(cdTime);
+		ballOnCool = false;
 	}
 }
