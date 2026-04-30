@@ -21,20 +21,26 @@ public class BouncyShoot : MonoBehaviour
 
         public GameObject spherePrefab;
 
+        public Vector3 mousePos;
+
         private bool ballOnCool;
+
+		public Camera camera;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
         	balls = new List<BallClass>();
             BallInstYesPrefab = spherePrefab;
+
+			 camera = GameObject.Find("Main Camera").GetComponent<Camera>();
     }
 
     // Update is called once per frame
     void Update()
     {
         // next: figure out how to do "is currently pressed down"
-        if (Keyboard.current.fKey.wa)
+        if (Keyboard.current.fKey.isPressed)
             {
 
 
@@ -44,6 +50,16 @@ public class BouncyShoot : MonoBehaviour
 				StartCoroutine(ballCD(Static.ballCoolTime));
 			    }
             }
+
+            // mousePos = GetComponent<Camera>().ScreenToWorldPoint(new Vector3 (Input.mousePosition.x, Input.mousePosition.y, Input.mousePosition.z + 1));
+
+			Vector2 mouseScreenPos = Mouse.current.position.ReadValue();
+
+			Vector3 mousePos = camera.ScreenToWorldPoint(
+				new Vector3(mouseScreenPos.x, mouseScreenPos.y, 1f)
+			);
+		
+		    transform.LookAt(mousePos);
  
 			// if (!ballOnCool)
 			// {
