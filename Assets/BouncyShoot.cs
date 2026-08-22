@@ -3,158 +3,199 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using DefaultNamespace;
-using JetBrains.Annotations;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using UnityEngine.InputSystem;
-using Unity.VisualScripting;
 
 public class BouncyShoot : MonoBehaviour
 {
+    public static readonly Color colorZero = Color.clear;
+    public static List<BallClass> balls;
+    public static Dictionary<GameObject, List<BallClass>> parentObjects;
 
+    public GameObject BallInstYesPrefab;
+    public GameObject BallInstNoPrefab;
+    public GameObject spherePrefab;
 
-    	public static readonly Color colorZero = Color.clear;
-        public static List<BallClass> balls;
+    public Vector3 mousePos;
+    public Camera camera;
 
-        public GameObject BallInstYesPrefab;
-        public GameObject BallInstNoPrefab;
+    private bool ballOnCool;
 
-        public GameObject spherePrefab;
+    // -------------------------------------------------------------------------
+    // LIFECYCLE
+    // -------------------------------------------------------------------------
 
-        public Vector3 mousePos;
-
-        private bool ballOnCool;
-
-		public Camera camera;
-
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        	balls = new List<BallClass>();
-            BallInstYesPrefab = spherePrefab;
-
-			 camera = GameObject.Find("Main Camera").GetComponent<Camera>();
+        balls = new List<BallClass>();
+        BallInstYesPrefab = spherePrefab;
+        camera = GameObject.Find("Main Camera").GetComponent<Camera>();
+        parentObjects = new Dictionary<GameObject, List<BallClass>>();
     }
 
-    // Update is called once per frame
     void Update()
     {
-        // next: figure out how to do "is currently pressed down"
+        // -- Aim at mouse --
+        Vector2 mouseScreenPos = Mouse.current.position.ReadValue();
+        Vector3 mouseWorldPos = camera.ScreenToWorldPoint(
+            new Vector3(mouseScreenPos.x, mouseScreenPos.y, 1f));
+        transform.LookAt(mouseWorldPos);
+
+        // -- Fire (held) --
         if (Keyboard.current.fKey.isPressed)
+        {
+            if (!ballOnCool)
+                StartCoroutine(ballCD(Static.ballCoolTime));
+        }
+
+        // -- Grid --
+        if (Keyboard.current.gKey.wasPressedThisFrame)
+        {
+            GameObject matrixParent = new GameObject("matrixParent");
+            List<BallClass> MatrixList = new List<BallClass>();
+
+            for (int i = 0; i < Static.matrixD1; i++)
             {
-
-
-                if (!ballOnCool)
-			    {
-				
-				StartCoroutine(ballCD(Static.ballCoolTime));
-			    }
+                for (int j = 0; j < Static.matrixD2; j++)
+                {
+                    for (int h = 0; h < Static.matrixD3; h++)
+                    {
+                        BallClass ballS = ballFire(this.gameObject, new Vector3(
+                            i * Static.ballSize * Static.ballSeperatness - Static.ballSize * Static.ballSeperatness * ((Static.matrixD1 - 1) / 2f),
+                            j * Static.ballSize * Static.ballSeperatness - Static.ballSize * Static.ballSeperatness * ((Static.matrixD2 - 1) / 2f),
+                            h * Static.ballSize * Static.ballSeperatness), colorZero);
+                        ballS.ball.transform.parent = matrixParent.transform;
+                        MatrixList.Add(ballS);
+                    }
+                }
             }
+            parentObjects[matrixParent] = MatrixList;
+        }
 
-            // mousePos = GetComponent<Camera>().ScreenToWorldPoint(new Vector3 (Input.mousePosition.x, Input.mousePosition.y, Input.mousePosition.z + 1));
+        // -- Destroy all balls --
+        if (Keyboard.current.tKey.wasPressedThisFrame)
+        {
+            foreach (BallClass bs in balls)
+            {
+                foreach (List<BallClass> list in parentObjects.Values)
+                {
+                    if (list.Contains(bs))
+                        list.Remove(bs);
+                }
+                Destroy(bs.ball);
+            }
+            balls.Clear();
+        }
 
-			Vector2 mouseScreenPos = Mouse.current.position.ReadValue();
-
-			Vector3 mousePos = camera.ScreenToWorldPoint(
-				new Vector3(mouseScreenPos.x, mouseScreenPos.y, 1f)
-			);
-		
-		    transform.LookAt(mousePos);
- 
-			// if (!ballOnCool)
-			// {
-				
-			// 	StartCoroutine(ballCD(Static.ballCoolTime));
-			// }
-        
+        // -- Spark away (tap K) --                         [STEP 1]
+        if (Keyboard.current.kKey.wasPressedThisFrame)
+        {
+            sparkAway();
+        }
     }
-
 
     void FixedUpdate()
     {
+        // -- Spark in (hold J) --                          [STEP 1]
+        if (Keyboard.current.jKey.isPressed)
+        {
+            sparkIn();
+        }
+
         addBallForces();
     }
 
-	public void addBallForces()
-	{
-		foreach (BallClass ball in balls)
-		{
-			ball.rB.AddForce(ball.totalForceToAdd);
-			ball.totalForceToAdd = Vector3.zero;
-		}
-	}
-
-
+    // -------------------------------------------------------------------------
+    // BALL SPAWNING
+    // -------------------------------------------------------------------------
 
     public BallClass ballFire(GameObject shootingObj, Vector3 addedVect, Color color)
-	{
-		//audio.Play ();
-//		print (mousePos);
-		//get camera position, add something to it in forward direction, then add the x and y position in respect to that.
+    {
+        GameObject newBall;
+        if (color == Color.clear || color == colorZero || color == Color.black)
+            newBall = Instantiate(BallInstYesPrefab, shootingObj.transform.position + addedVect, Quaternion.identity);
+        else
+            newBall = Instantiate(BallInstNoPrefab, shootingObj.transform.position + addedVect, Quaternion.identity);
 
-		
-		//HOTFIX CHANGE THIS BACK: THIS MAKES IT SO ALL COLORS ARE WHITE
-		//if (color != Color.white)
-		{
-		//	color = Color.white;
-		}
+        BallClass ballClass = new BallClass();
+        ballClass.ball    = newBall;
+        ballClass.bS      = newBall.GetComponent<BallScript>();
+        ballClass.rB      = newBall.GetComponent<Rigidbody>();
+        ballClass.relativeStartPos = addedVect;
 
+        balls.Add(ballClass);
 
-		GameObject newBall;
-		//true is here to always make it a gpu instanced no-color ball because the images he sent
-		//were not true black 
-		if (color == Color.clear  || color == colorZero || color == Color.black)
-		{
-			newBall = Instantiate(BallInstYesPrefab, shootingObj.transform.position + addedVect, Quaternion.identity);
-		}
-		else
-		{
-			newBall = Instantiate(BallInstNoPrefab, shootingObj.transform.position + addedVect, Quaternion.identity);
-		}
-		BallClass ballClass = new BallClass();
-		ballClass.ball = newBall;
-		ballClass.bS = newBall.GetComponent<BallScript>();
-		ballClass.rB = newBall.GetComponent<Rigidbody>();
-		ballClass.relativeStartPos = addedVect;
-		
-		balls.Add(ballClass);
+        if (color != colorZero && color != Color.black)
+            newBall.GetComponent<MeshRenderer>().material.SetColor("_Color", color);
 
-		
-		//false is here to always make it a gpu instanced no-color ball because the images he sent
-		//were not true black. up there its true and here its false because the statements ar ereverse
-		if (color != colorZero  && color != Color.black)
-		{
-			newBall.GetComponent<MeshRenderer>().material.SetColor("_Color", color);
-		}
-		else
-		{
-		//check box for this
-			//obj.GetComponent<MeshRenderer>().material.SetColor("_Color", Random.ColorHSV());
-		}
-		if (Static.velocityDirectToggle)
-		{
-			ballClass.rB.linearVelocity = shootingObj.transform.forward * Static.ballVelocity;
-		}
-		else
-		{
-			Vector3 forceAddedVect = shootingObj.transform.forward * Static.ballForce;
-			ballClass.totalForceToAdd += forceAddedVect;
-		}
-		// int randomSound = Random.Range(0, bounceSounds.Length - 1);
-		//obj.GetComponent<AudioSource>().clip = bounceSounds[randomSound];
-		newBall.transform.localScale = new Vector3(Static.ballSize * newBall.transform.localScale.x, Static.ballSize * newBall.transform.localScale.y, Static.ballSize * newBall.transform.localScale.z);
+        if (Static.velocityDirectToggle)
+            ballClass.rB.linearVelocity = shootingObj.transform.forward * Static.ballVelocity;
+        else
+            ballClass.totalForceToAdd += shootingObj.transform.forward * Static.ballForce;
 
-		return ballClass;
+        newBall.transform.localScale = new Vector3(
+            Static.ballSize * newBall.transform.localScale.x,
+            Static.ballSize * newBall.transform.localScale.y,
+            Static.ballSize * newBall.transform.localScale.z);
 
-	}
+        return ballClass;
+    }
 
+    public IEnumerator ballCD(float cdTime)
+    {
+        ballOnCool = true;
+        ballFire(this.gameObject, Vector3.zero, colorZero);
+        yield return new WaitForSeconds(cdTime);
+        ballOnCool = false;
+    }
 
+    // -------------------------------------------------------------------------
+    // FORCES
+    // -------------------------------------------------------------------------
 
-    	public IEnumerator ballCD(float cdTime)
-	{
-		ballOnCool = true;
-		ballFire(this.gameObject, Vector3.zero, colorZero);
-		yield return new WaitForSeconds(cdTime);
-		ballOnCool = false;
-	}
+    public void addBallForces()
+    {
+        foreach (BallClass ball in balls)
+        {
+            ball.rB.AddForce(ball.totalForceToAdd);
+            ball.totalForceToAdd = Vector3.zero;
+        }
+    }
+
+    // Tap K — blast all balls away from origin                [STEP 1]
+    public void sparkAway()
+    {
+        foreach (BallClass bStruct in balls)
+            bStruct.totalForceToAdd += bStruct.ball.transform.position.normalized * 20000;
+    }
+
+    // Hold J — pull all balls toward origin                   [STEP 1]
+    public void sparkIn()
+    {
+        foreach (BallClass bStruct in balls)
+            bStruct.totalForceToAdd += bStruct.ball.transform.position.normalized * -100;
+    }
+
+    // -------------------------------------------------------------------------
+    // UTILITIES
+    // -------------------------------------------------------------------------
+
+    // Returns the average position of all live balls          [STEP 1]
+    // (needed by returnToParentPosition and returnToAllPosition in later steps)
+    public Vector3 calculateMidPoint(List<BallClass> ballsList)
+    {
+        Vector3 totalVect = Vector3.zero;
+        for (int i = ballsList.Count - 1; i > -1; i--)
+        {
+            if (ballsList[i].ball != null)
+                totalVect += ballsList[i].ball.transform.position;
+            else
+                ballsList.RemoveAt(i);
+        }
+        return totalVect / Mathf.Max(ballsList.Count, 1);
+    }
+
+    // Placeholder — materials wired up in a later step
+    public void updateBallColor() { }
 }
