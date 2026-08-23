@@ -937,6 +937,7 @@ MonoBehaviour:
   spherePrefab: {fileID: 6954357075162129829, guid: 93660fdca8c7d4698a2fc0e5a504c515, type: 3}
   mousePos: {x: 0, y: 0, z: 0}
   camera: {fileID: 0}
+  spaceMult: 0.008
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

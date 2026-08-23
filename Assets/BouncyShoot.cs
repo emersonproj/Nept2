@@ -22,6 +22,9 @@ public class BouncyShoot : MonoBehaviour
 
     private bool ballOnCool;
 
+    // Controls strength of the V "return to all positions" force  [STEP 2]
+    public float spaceMult = 0.008f;
+
     // -------------------------------------------------------------------------
     // LIFECYCLE
     // -------------------------------------------------------------------------
@@ -88,7 +91,7 @@ public class BouncyShoot : MonoBehaviour
             balls.Clear();
         }
 
-        // -- Spark away (tap K) --                         [STEP 1]
+        // -- Spark away (tap K) --
         if (Keyboard.current.kKey.wasPressedThisFrame)
         {
             sparkAway();
@@ -97,11 +100,13 @@ public class BouncyShoot : MonoBehaviour
 
     void FixedUpdate()
     {
-        // -- Spark in (hold J) --                          [STEP 1]
+        // -- Spark in (hold J) --
         if (Keyboard.current.jKey.isPressed)
-        {
             sparkIn();
-        }
+
+        // -- Return all balls to their relative start positions (hold V) -- [STEP 2]
+        if (Keyboard.current.vKey.isPressed)
+            returnToAllPosition();
 
         addBallForces();
     }
@@ -119,9 +124,9 @@ public class BouncyShoot : MonoBehaviour
             newBall = Instantiate(BallInstNoPrefab, shootingObj.transform.position + addedVect, Quaternion.identity);
 
         BallClass ballClass = new BallClass();
-        ballClass.ball    = newBall;
-        ballClass.bS      = newBall.GetComponent<BallScript>();
-        ballClass.rB      = newBall.GetComponent<Rigidbody>();
+        ballClass.ball = newBall;
+        ballClass.bS   = newBall.GetComponent<BallScript>();
+        ballClass.rB   = newBall.GetComponent<Rigidbody>();
         ballClass.relativeStartPos = addedVect;
 
         balls.Add(ballClass);
@@ -163,26 +168,47 @@ public class BouncyShoot : MonoBehaviour
         }
     }
 
-    // Tap K — blast all balls away from origin                [STEP 1]
+    // Tap K — blast all balls away from origin
     public void sparkAway()
     {
         foreach (BallClass bStruct in balls)
             bStruct.totalForceToAdd += bStruct.ball.transform.position.normalized * 20000;
     }
 
-    // Hold J — pull all balls toward origin                   [STEP 1]
+    // Hold J — pull all balls toward origin
     public void sparkIn()
     {
         foreach (BallClass bStruct in balls)
             bStruct.totalForceToAdd += bStruct.ball.transform.position.normalized * -100;
     }
 
+    // Hold V — push each ball back toward its original relative position   [STEP 2]
+    public void returnToAllPosition()
+    {
+        Vector3 midPoint = calculateMidPoint(balls);
+
+        foreach (BallClass bStruct in balls)
+        {
+            Vector3 directionToAdd = (bStruct.relativeStartPos - (bStruct.ball.transform.position - midPoint));
+
+            if (Vector3.Distance(bStruct.ball.transform.position, midPoint) > .2f)
+            {
+                Vector3 shouldVelocity = 3 * directionToAdd.normalized * Mathf.Pow(directionToAdd.magnitude, .4f);
+
+                // Note: 1/3 is integer division (= 0) so the Pow term is always 1 — matches original behaviour
+                Vector3 forceAdded = spaceMult * 5 * ((shouldVelocity - bStruct.rB.linearVelocity).normalized *
+                                      Mathf.Pow(Vector3.Distance(shouldVelocity, bStruct.rB.linearVelocity), 2) /
+                                      Mathf.Pow(Mathf.Clamp(Vector3.Distance(midPoint, transform.position), .3f, 5000), 1 / 3));
+
+                bStruct.totalForceToAdd += forceAdded;
+            }
+        }
+    }
+
     // -------------------------------------------------------------------------
     // UTILITIES
     // -------------------------------------------------------------------------
 
-    // Returns the average position of all live balls          [STEP 1]
-    // (needed by returnToParentPosition and returnToAllPosition in later steps)
     public Vector3 calculateMidPoint(List<BallClass> ballsList)
     {
         Vector3 totalVect = Vector3.zero;
@@ -196,6 +222,5 @@ public class BouncyShoot : MonoBehaviour
         return totalVect / Mathf.Max(ballsList.Count, 1);
     }
 
-    // Placeholder — materials wired up in a later step
     public void updateBallColor() { }
 }
