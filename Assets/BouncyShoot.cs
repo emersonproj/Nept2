@@ -17,6 +17,13 @@ public class BouncyShoot : MonoBehaviour
     public GameObject BallInstNoPrefab;
     public GameObject spherePrefab;
 
+    public Texture2D testImage;
+
+    // [STEP 7] Assign ball shape prefabs in the inspector.
+    // Index 0 = default sphere, index 1 = alternate shape used by fireCircleDoubleCone.
+    // H key cycles through them.
+    public List<GameObject> ballPrefabs;
+
     public Vector3 mousePos;
     public Camera camera;
 
@@ -24,22 +31,20 @@ public class BouncyShoot : MonoBehaviour
     public float spaceMult  = 0.008f;
     public float spaceAccel = 0.4f;
 
-    // [STEP 5] Drag your ball materials into these slots in the inspector
-    // ballDefaultMat     — the shared material on GPU-instanced (colorless) balls
-    // ballTransparentMat — the material on non-instanced (colored) balls
     public Material ballDefaultMat;
     public Material ballTransparentMat;
 
-    // [STEP 5] Auto-detects URP vs Built-in so color property names are correct
-    // URP uses "_BaseColor", Built-in uses "_Color"
     private string colorPropName =>
         UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline != null
             ? "_BaseColor" : "_Color";
 
-    // Smoothness property also differs between pipelines
     private string smoothnessPropName =>
         UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline != null
             ? "_Smoothness" : "_Glossiness";
+
+    // [STEP 7] Manager references — these components sit on the same GameObject
+    private GeometryLaunchManager geometryLaunchManager;
+    private Gatling gatling;
 
     // -------------------------------------------------------------------------
     // LIFECYCLE
@@ -52,11 +57,22 @@ public class BouncyShoot : MonoBehaviour
         camera = GameObject.Find("Main Camera").GetComponent<Camera>();
         parentObjects = new Dictionary<GameObject, List<BallClass>>();
 
-        // [STEP 5] Default ball color: light gray
+        // [STEP 7] Wire manager references
+        geometryLaunchManager = GetComponent<GeometryLaunchManager>();
+        gatling = GetComponent<Gatling>();
+
+        GeometryLaunchManager.bouncyShootRef = this;
+        ImageCreater.bouncyShootRef          = this;
+        MeshVertManager.bouncyShootRef       = this;
+        if (gatling != null) gatling.bouncyShootRef = this;
+
+        // Default ball color: light gray
         Static.ballColorR = 190;
         Static.ballColorG = 190;
         Static.ballColorB = 190;
         updateBallColor();
+
+        Static.currentImage = testImage;
     }
 
     void Update()
@@ -131,11 +147,10 @@ public class BouncyShoot : MonoBehaviour
         if (Keyboard.current.zKey.wasPressedThisFrame)
             camera.nearClipPlane = camera.nearClipPlane == .3f ? 99999f : .3f;
 
-        // [STEP 5] Shift + number key — color presets
+        // -- Color presets (Shift + number) --
         bool shift = Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed;
         if (shift)
         {
-            // 1: gray  2: blue  3: red  4: green  5: cyan  6: violet
             if (Keyboard.current.digit1Key.wasPressedThisFrame) { Static.ballColorR=190; Static.ballColorG=190; Static.ballColorB=190; updateBallColor(); }
             if (Keyboard.current.digit2Key.wasPressedThisFrame) { Static.ballColorR=0;   Static.ballColorG=0;   Static.ballColorB=245; updateBallColor(); }
             if (Keyboard.current.digit3Key.wasPressedThisFrame) { Static.ballColorR=160; Static.ballColorG=0;   Static.ballColorB=0;   updateBallColor(); }
@@ -143,6 +158,88 @@ public class BouncyShoot : MonoBehaviour
             if (Keyboard.current.digit5Key.wasPressedThisFrame) { Static.ballColorR=0;   Static.ballColorG=200; Static.ballColorB=200; updateBallColor(); }
             if (Keyboard.current.digit6Key.wasPressedThisFrame) { Static.ballColorR=50;  Static.ballColorG=0;   Static.ballColorB=200; updateBallColor(); }
         }
+
+        // [STEP 7] H — cycle ball shape
+        if (Keyboard.current.hKey.wasPressedThisFrame)
+        {
+            Static.currentBallShape++;
+            if (ballPrefabs != null && ballPrefabs.Count > 0)
+                BallInstYesPrefab = ballPrefabs[Static.currentBallShape % ballPrefabs.Count];
+        }
+
+        // [STEP 7] S — fire circle (200 balls, radius 10)
+        if (Keyboard.current.sKey.wasPressedThisFrame)
+        {
+            GameObject parent = new GameObject("circleParent");
+            parent.transform.position = transform.position;
+            parentObjects[parent] = GeometryLaunchManager.fireCircle(parent, 200, 10);
+            rotateParent(parent, transform.rotation);
+            Vector3 mid = calculateMidPoint(parentObjects[parent]);
+            foreach (BallClass ball in parentObjects[parent])
+                ball.relativePosToCenter = ball.ball.transform.position - mid;
+        }
+
+        // [STEP 7] A — fire double cone (fires over time via coroutine)
+        // Note: relativePosToCenter won't be set on arrival since balls spawn over ~2 seconds.
+        // Space key will still reform the shape once all balls have spawned.
+        if (Keyboard.current.aKey.wasPressedThisFrame && geometryLaunchManager != null)
+        {
+            GameObject parent = new GameObject("doubleConeParent");
+            parent.transform.position = transform.position;
+            parentObjects[parent] = geometryLaunchManager.fireCircleDoubleCone(parent);
+            rotateParent(parent, transform.rotation);
+        }
+
+        // [STEP 7] D — fire vert model (needs prefabs in Assets/Resources/VertModels)
+        if (Keyboard.current.dKey.wasPressedThisFrame)
+        {
+            if (MeshVertManager.vertModelDict != null && MeshVertManager.vertModelDict.Count > 0)
+            {
+                GameObject parent = new GameObject("vertModelParent");
+                parent.transform.position = transform.position;
+                parentObjects[parent] = MeshVertManager.fireVertModel(parent);
+                rotateParent(parent, transform.rotation);
+                Vector3 mid = calculateMidPoint(parentObjects[parent]);
+                foreach (BallClass ball in parentObjects[parent])
+                    ball.relativePosToCenter = ball.ball.transform.position - mid;
+            }
+            else
+            {
+                Debug.LogWarning("D key: no vert models loaded. Add prefabs to Assets/Resources/VertModels.");
+            }
+        }
+
+        // [STEP 7] I — fire image (needs Static.currentImage assigned)
+        if (Keyboard.current.iKey.wasPressedThisFrame)
+        {
+            if (Static.currentImage != null && Static.imageDivideBy != 0)
+            {
+                GameObject parent = new GameObject("imageParent");
+                parent.transform.position = transform.position;
+                parentObjects[parent] = ImageCreater.fireImage(Static.currentImage, Static.imageDivideBy, parent);
+                Vector3 mid = calculateMidPoint(parentObjects[parent]);
+                foreach (BallClass ball in parentObjects[parent])
+                    ball.relativePosToCenter = ball.ball.transform.position - mid;
+            }
+            else
+            {
+                Debug.LogWarning("I key: Static.currentImage is null. Assign a Texture2D to Static.currentImage.");
+            }
+        }
+
+        // [STEP 7] B — gatling gun (hold to fire, release to stop)
+        if (Keyboard.current.bKey.wasPressedThisFrame && gatling != null)
+        {
+            gatling.firingOn(0f,    true);
+            gatling.firingOn(.33f,  true);
+            gatling.firingOn(.66f,  true);
+        }
+        if (Keyboard.current.bKey.wasReleasedThisFrame && gatling != null)
+            gatling.firingOff();
+
+        // [STEP 7] M — circle gatling toggle
+        if (Keyboard.current.mKey.wasPressedThisFrame && gatling != null)
+            gatling.firingCircleToggle();
     }
 
     void FixedUpdate()
@@ -177,7 +274,6 @@ public class BouncyShoot : MonoBehaviour
         ballClass.relativeStartPos = addedVect;
         balls.Add(ballClass);
 
-        // [STEP 5] Uses colorPropName so it works on both URP and Built-in
         if (color != colorZero && color != Color.black)
             newBall.GetComponent<MeshRenderer>().material.SetColor(colorPropName, color);
 
@@ -280,10 +376,9 @@ public class BouncyShoot : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
-    // COLOR & MATERIAL                                               [STEP 5]
+    // COLOR & MATERIAL
     // -------------------------------------------------------------------------
 
-    // Updates the shared ball material color — affects all instanced balls at once
     public void updateBallColor()
     {
         Color col = new Color(
@@ -295,7 +390,6 @@ public class BouncyShoot : MonoBehaviour
         if (ballTransparentMat) ballTransparentMat.SetColor(colorPropName, col);
     }
 
-    // Called by UIManager sliders for R, G, B, A (0–255 for RGB, 0–1 for A)
     public void setColorR(float r) { Static.ballColorR = Mathf.RoundToInt(r); updateBallColor(); }
     public void setColorG(float g) { Static.ballColorG = Mathf.RoundToInt(g); updateBallColor(); }
     public void setColorB(float b) { Static.ballColorB = Mathf.RoundToInt(b); updateBallColor(); }
