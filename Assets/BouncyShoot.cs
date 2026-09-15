@@ -24,6 +24,23 @@ public class BouncyShoot : MonoBehaviour
     public float spaceMult  = 0.008f;
     public float spaceAccel = 0.4f;
 
+    // [STEP 5] Drag your ball materials into these slots in the inspector
+    // ballDefaultMat     — the shared material on GPU-instanced (colorless) balls
+    // ballTransparentMat — the material on non-instanced (colored) balls
+    public Material ballDefaultMat;
+    public Material ballTransparentMat;
+
+    // [STEP 5] Auto-detects URP vs Built-in so color property names are correct
+    // URP uses "_BaseColor", Built-in uses "_Color"
+    private string colorPropName =>
+        UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline != null
+            ? "_BaseColor" : "_Color";
+
+    // Smoothness property also differs between pipelines
+    private string smoothnessPropName =>
+        UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline != null
+            ? "_Smoothness" : "_Glossiness";
+
     // -------------------------------------------------------------------------
     // LIFECYCLE
     // -------------------------------------------------------------------------
@@ -34,6 +51,12 @@ public class BouncyShoot : MonoBehaviour
         BallInstYesPrefab = spherePrefab;
         camera = GameObject.Find("Main Camera").GetComponent<Camera>();
         parentObjects = new Dictionary<GameObject, List<BallClass>>();
+
+        // [STEP 5] Default ball color: light gray
+        Static.ballColorR = 190;
+        Static.ballColorG = 190;
+        Static.ballColorB = 190;
+        updateBallColor();
     }
 
     void Update()
@@ -87,37 +110,46 @@ public class BouncyShoot : MonoBehaviour
         if (Keyboard.current.kKey.wasPressedThisFrame)
             sparkAway();
 
-        // [STEP 4] Reload scene — clears everything back to a clean state
+        // -- Reload scene --
         if (Keyboard.current.rKey.wasPressedThisFrame)
             SceneManager.LoadScene(0);
 
-        // [STEP 4] Semicolon — pause / unpause
+        // -- Pause / unpause --
         if (Keyboard.current.semicolonKey.wasPressedThisFrame)
         {
             Static.timeStep = Static.timeStep != 0 ? 0 : 0.7f;
             Time.timeScale  = Static.timeStep;
         }
 
-        // [STEP 4] U / Y — toggle gravity multiplier (used by black holes later)
+        // -- Toggle gMult --
         if (Keyboard.current.uKey.wasPressedThisFrame)
             Static.gMult = Static.gMult != 0 ? 0 : 30f;
-
         if (Keyboard.current.yKey.wasPressedThisFrame)
             Static.gMult = Static.gMult != 0 ? 0 : 500f;
 
-        // [STEP 4] Z — toggle near clip plane, lets you clip inside ball clusters
+        // -- Toggle near clip plane --
         if (Keyboard.current.zKey.wasPressedThisFrame)
             camera.nearClipPlane = camera.nearClipPlane == .3f ? 99999f : .3f;
+
+        // [STEP 5] Shift + number key — color presets
+        bool shift = Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed;
+        if (shift)
+        {
+            // 1: gray  2: blue  3: red  4: green  5: cyan  6: violet
+            if (Keyboard.current.digit1Key.wasPressedThisFrame) { Static.ballColorR=190; Static.ballColorG=190; Static.ballColorB=190; updateBallColor(); }
+            if (Keyboard.current.digit2Key.wasPressedThisFrame) { Static.ballColorR=0;   Static.ballColorG=0;   Static.ballColorB=245; updateBallColor(); }
+            if (Keyboard.current.digit3Key.wasPressedThisFrame) { Static.ballColorR=160; Static.ballColorG=0;   Static.ballColorB=0;   updateBallColor(); }
+            if (Keyboard.current.digit4Key.wasPressedThisFrame) { Static.ballColorR=0;   Static.ballColorG=140; Static.ballColorB=0;   updateBallColor(); }
+            if (Keyboard.current.digit5Key.wasPressedThisFrame) { Static.ballColorR=0;   Static.ballColorG=200; Static.ballColorB=200; updateBallColor(); }
+            if (Keyboard.current.digit6Key.wasPressedThisFrame) { Static.ballColorR=50;  Static.ballColorG=0;   Static.ballColorB=200; updateBallColor(); }
+        }
     }
 
     void FixedUpdate()
     {
-        if (Keyboard.current.jKey.isPressed)
-            sparkIn();
-        if (Keyboard.current.vKey.isPressed)
-            returnToAllPosition();
-        if (Keyboard.current.spaceKey.isPressed)
-            returnToParentPosition();
+        if (Keyboard.current.jKey.isPressed)    sparkIn();
+        if (Keyboard.current.vKey.isPressed)    returnToAllPosition();
+        if (Keyboard.current.spaceKey.isPressed) returnToParentPosition();
 
         addBallForces();
 
@@ -145,8 +177,9 @@ public class BouncyShoot : MonoBehaviour
         ballClass.relativeStartPos = addedVect;
         balls.Add(ballClass);
 
+        // [STEP 5] Uses colorPropName so it works on both URP and Built-in
         if (color != colorZero && color != Color.black)
-            newBall.GetComponent<MeshRenderer>().material.SetColor("_Color", color);
+            newBall.GetComponent<MeshRenderer>().material.SetColor(colorPropName, color);
 
         if (Static.velocityDirectToggle)
             ballClass.rB.linearVelocity = shootingObj.transform.forward * Static.ballVelocity;
@@ -247,6 +280,42 @@ public class BouncyShoot : MonoBehaviour
     }
 
     // -------------------------------------------------------------------------
+    // COLOR & MATERIAL                                               [STEP 5]
+    // -------------------------------------------------------------------------
+
+    // Updates the shared ball material color — affects all instanced balls at once
+    public void updateBallColor()
+    {
+        Color col = new Color(
+            Static.ballColorR / 255f,
+            Static.ballColorG / 255f,
+            Static.ballColorB / 255f,
+            Static.ballColorA);
+        if (ballDefaultMat)     ballDefaultMat.SetColor(colorPropName, col);
+        if (ballTransparentMat) ballTransparentMat.SetColor(colorPropName, col);
+    }
+
+    // Called by UIManager sliders for R, G, B, A (0–255 for RGB, 0–1 for A)
+    public void setColorR(float r) { Static.ballColorR = Mathf.RoundToInt(r); updateBallColor(); }
+    public void setColorG(float g) { Static.ballColorG = Mathf.RoundToInt(g); updateBallColor(); }
+    public void setColorB(float b) { Static.ballColorB = Mathf.RoundToInt(b); updateBallColor(); }
+    public void setColorA(float a) { Static.ballColorA = a;                   updateBallColor(); }
+
+    public void setMetallic(float v)
+    {
+        Static.ballMetallic = v;
+        if (ballDefaultMat)     ballDefaultMat.SetFloat("_Metallic", v);
+        if (ballTransparentMat) ballTransparentMat.SetFloat("_Metallic", v);
+    }
+
+    public void setSmoothness(float v)
+    {
+        Static.ballSmoothness = v;
+        if (ballDefaultMat)     ballDefaultMat.SetFloat(smoothnessPropName, v);
+        if (ballTransparentMat) ballTransparentMat.SetFloat(smoothnessPropName, v);
+    }
+
+    // -------------------------------------------------------------------------
     // UTILITIES
     // -------------------------------------------------------------------------
 
@@ -267,6 +336,4 @@ public class BouncyShoot : MonoBehaviour
         }
         return totalVect / Mathf.Max(ballsList.Count, 1);
     }
-
-    public void updateBallColor() { }
 }
