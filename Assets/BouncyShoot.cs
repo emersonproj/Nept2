@@ -16,12 +16,6 @@ public class BouncyShoot : MonoBehaviour
     public GameObject BallInstYesPrefab;
     public GameObject BallInstNoPrefab;
     public GameObject spherePrefab;
-
-    public Texture2D testImage;
-
-    // [STEP 7] Assign ball shape prefabs in the inspector.
-    // Index 0 = default sphere, index 1 = alternate shape used by fireCircleDoubleCone.
-    // H key cycles through them.
     public List<GameObject> ballPrefabs;
 
     public Vector3 mousePos;
@@ -42,9 +36,16 @@ public class BouncyShoot : MonoBehaviour
         UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline != null
             ? "_Smoothness" : "_Glossiness";
 
-    // [STEP 7] Manager references — these components sit on the same GameObject
     private GeometryLaunchManager geometryLaunchManager;
     private Gatling gatling;
+
+    // [STEP 8] Camera control references
+    // DragMouseOrbit and MouseLook should be components on the Main Camera GameObject
+    public DragMouseOrbit dragMouseOrbitRef;
+    public MouseLook mouseLookRef;
+    public GameObject camTarget; // optional — orbit target; null = orbits around origin
+    private CameraManager cameraManager;
+    private int cameraSetting = 0;
 
     // -------------------------------------------------------------------------
     // LIFECYCLE
@@ -57,7 +58,6 @@ public class BouncyShoot : MonoBehaviour
         camera = GameObject.Find("Main Camera").GetComponent<Camera>();
         parentObjects = new Dictionary<GameObject, List<BallClass>>();
 
-        // [STEP 7] Wire manager references
         geometryLaunchManager = GetComponent<GeometryLaunchManager>();
         gatling = GetComponent<Gatling>();
 
@@ -66,14 +66,22 @@ public class BouncyShoot : MonoBehaviour
         MeshVertManager.bouncyShootRef       = this;
         if (gatling != null) gatling.bouncyShootRef = this;
 
-        // Default ball color: light gray
+        // [STEP 8] Wire camera components — both scripts live on the Main Camera
+        mouseLookRef      = camera.GetComponent<MouseLook>();
+        dragMouseOrbitRef = camera.GetComponent<DragMouseOrbit>();
+
+        // CameraManager lives on a separate GameObject; null-safe if not yet set up
+        cameraManager = FindFirstObjectByType<CameraManager>();
+
         Static.ballColorR = 190;
         Static.ballColorG = 190;
         Static.ballColorB = 190;
         updateBallColor();
-
-        Static.currentImage = testImage;
     }
+
+    // -------------------------------------------------------------------------
+    // UPDATE
+    // -------------------------------------------------------------------------
 
     void Update()
     {
@@ -159,7 +167,7 @@ public class BouncyShoot : MonoBehaviour
             if (Keyboard.current.digit6Key.wasPressedThisFrame) { Static.ballColorR=50;  Static.ballColorG=0;   Static.ballColorB=200; updateBallColor(); }
         }
 
-        // [STEP 7] H — cycle ball shape
+        // -- H: cycle ball shape --
         if (Keyboard.current.hKey.wasPressedThisFrame)
         {
             Static.currentBallShape++;
@@ -167,7 +175,7 @@ public class BouncyShoot : MonoBehaviour
                 BallInstYesPrefab = ballPrefabs[Static.currentBallShape % ballPrefabs.Count];
         }
 
-        // [STEP 7] S — fire circle (200 balls, radius 10)
+        // -- S: circle --
         if (Keyboard.current.sKey.wasPressedThisFrame)
         {
             GameObject parent = new GameObject("circleParent");
@@ -179,9 +187,7 @@ public class BouncyShoot : MonoBehaviour
                 ball.relativePosToCenter = ball.ball.transform.position - mid;
         }
 
-        // [STEP 7] A — fire double cone (fires over time via coroutine)
-        // Note: relativePosToCenter won't be set on arrival since balls spawn over ~2 seconds.
-        // Space key will still reform the shape once all balls have spawned.
+        // -- A: double cone --
         if (Keyboard.current.aKey.wasPressedThisFrame && geometryLaunchManager != null)
         {
             GameObject parent = new GameObject("doubleConeParent");
@@ -190,7 +196,7 @@ public class BouncyShoot : MonoBehaviour
             rotateParent(parent, transform.rotation);
         }
 
-        // [STEP 7] D — fire vert model (needs prefabs in Assets/Resources/VertModels)
+        // -- D: vert model --
         if (Keyboard.current.dKey.wasPressedThisFrame)
         {
             if (MeshVertManager.vertModelDict != null && MeshVertManager.vertModelDict.Count > 0)
@@ -204,12 +210,10 @@ public class BouncyShoot : MonoBehaviour
                     ball.relativePosToCenter = ball.ball.transform.position - mid;
             }
             else
-            {
                 Debug.LogWarning("D key: no vert models loaded. Add prefabs to Assets/Resources/VertModels.");
-            }
         }
 
-        // [STEP 7] I — fire image (needs Static.currentImage assigned)
+        // -- I: image --
         if (Keyboard.current.iKey.wasPressedThisFrame)
         {
             if (Static.currentImage != null && Static.imageDivideBy != 0)
@@ -222,30 +226,32 @@ public class BouncyShoot : MonoBehaviour
                     ball.relativePosToCenter = ball.ball.transform.position - mid;
             }
             else
-            {
                 Debug.LogWarning("I key: Static.currentImage is null. Assign a Texture2D to Static.currentImage.");
-            }
         }
 
-        // [STEP 7] B — gatling gun (hold to fire, release to stop)
+        // -- B: gatling (hold) --
         if (Keyboard.current.bKey.wasPressedThisFrame && gatling != null)
         {
-            gatling.firingOn(0f,    true);
-            gatling.firingOn(.33f,  true);
-            gatling.firingOn(.66f,  true);
+            gatling.firingOn(0f,   true);
+            gatling.firingOn(.33f, true);
+            gatling.firingOn(.66f, true);
         }
         if (Keyboard.current.bKey.wasReleasedThisFrame && gatling != null)
             gatling.firingOff();
 
-        // [STEP 7] M — circle gatling toggle
+        // -- M: circle gatling toggle --
         if (Keyboard.current.mKey.wasPressedThisFrame && gatling != null)
             gatling.firingCircleToggle();
     }
 
+    // -------------------------------------------------------------------------
+    // FIXED UPDATE
+    // -------------------------------------------------------------------------
+
     void FixedUpdate()
     {
-        if (Keyboard.current.jKey.isPressed)    sparkIn();
-        if (Keyboard.current.vKey.isPressed)    returnToAllPosition();
+        if (Keyboard.current.jKey.isPressed)     sparkIn();
+        if (Keyboard.current.vKey.isPressed)     returnToAllPosition();
         if (Keyboard.current.spaceKey.isPressed) returnToParentPosition();
 
         addBallForces();
@@ -253,6 +259,77 @@ public class BouncyShoot : MonoBehaviour
         for (int i = parentObjects.Count - 1; i > -1; i--)
             if (parentObjects.ElementAt(i).Value.Count == 0)
                 parentObjects.Remove(parentObjects.ElementAt(i).Key);
+    }
+
+    // -------------------------------------------------------------------------
+    // LATE UPDATE — camera controls                                   [STEP 8]
+    // -------------------------------------------------------------------------
+
+    void LateUpdate()
+    {
+        // Reset look orientation when shift is pressed/released so there's
+        // no jump when switching between orbit and free-look modes
+        if (Keyboard.current.leftShiftKey.wasPressedThisFrame)
+            mouseLookRef?.setRotationToCurrent();
+        if (Keyboard.current.leftShiftKey.wasReleasedThisFrame)
+            mouseLookRef?.setRotationToCurrent();
+
+        // Arrow keys: up/down zoom, left/right orbit
+        if (Keyboard.current.upArrowKey.isPressed)
+        {
+            camera.gameObject.transform.position *= .997f;
+            cameraManager?.zoom(.997f);
+        }
+        if (Keyboard.current.downArrowKey.isPressed)
+        {
+            camera.gameObject.transform.position *= 1.003f;
+            cameraManager?.zoom(1.003f);
+        }
+
+        Vector3 targetPos = camTarget ? camTarget.transform.position : Vector3.zero;
+        float dist = Vector3.Distance(camera.gameObject.transform.position, targetPos);
+
+        if (Keyboard.current.leftArrowKey.isPressed)
+            dragMouseOrbitRef?.rotateLeft(dist, targetPos);
+        if (Keyboard.current.rightArrowKey.isPressed)
+            dragMouseOrbitRef?.rotateRight(dist, targetPos);
+
+        // Right mouse button: reset look on press, then orbit (shift) or free-look
+        if (Mouse.current.rightButton.wasPressedThisFrame)
+            mouseLookRef?.setRotationToCurrent();
+
+        if (Mouse.current.rightButton.isPressed)
+        {
+            if (Keyboard.current.leftShiftKey.isPressed)
+                dragMouseOrbitRef?.updateMouseOrbit(dist, targetPos);
+            else
+                mouseLookRef?.updateMouseLook();
+        }
+
+        // Scroll wheel zoom
+        float scroll = Mouse.current.scroll.ReadValue().y;
+        if (scroll > 0f && dist > 1f)
+        {
+            camera.gameObject.transform.position *= .99f;
+            cameraManager?.zoom(.99f);
+        }
+        else if (scroll < 0f && dist < 5000f)
+        {
+            camera.gameObject.transform.position *= 1.01f;
+            cameraManager?.zoom(1.01f);
+        }
+
+        // C key — toggle color cycling on all balls
+        if (Keyboard.current.cKey.wasPressedThisFrame)
+            foreach (BallClass bC in balls)
+                bC.bS.colorChangeToggle();
+
+        // Quote key — cycle extra camera modes (only if CameraManager is set up)
+        if (Keyboard.current.quoteKey.wasPressedThisFrame && cameraManager != null)
+        {
+            cameraSetting++;
+            cameraManager.switchCam(cameraSetting % CameraManager.NUMBERCAMTYPES);
+        }
     }
 
     // -------------------------------------------------------------------------
