@@ -36,7 +36,7 @@ public static class Static
 
 	public static float gAddedPre = 0;
 	public static float gAddedPost = 0;
-	public static float gMult = 30;
+	public static float gMult = 1000;
 	public static float gExp = 2;
 	public static float bDist = 50;
 	public static float bHIncrement;

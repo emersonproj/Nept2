@@ -153,11 +153,11 @@ public class BouncyShoot : MonoBehaviour
             Time.timeScale  = Static.timeStep;
         }
 
-        // -- U / Y: toggle gravity multiplier --
+        // to:
         if (Keyboard.current.uKey.wasPressedThisFrame)
-            Static.gMult = Static.gMult != 0 ? 0 : 30f;
+            Static.gMult = Static.gMult != 0 ? 0 : 1000f;
         if (Keyboard.current.yKey.wasPressedThisFrame)
-            Static.gMult = Static.gMult != 0 ? 0 : 500f;
+            Static.gMult = Static.gMult != 0 ? 0 : 5000f;
 
         // -- Z: toggle near clip plane (clip inside ball clusters) --
         if (Keyboard.current.zKey.wasPressedThisFrame)
