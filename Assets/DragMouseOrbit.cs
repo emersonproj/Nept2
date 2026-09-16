@@ -1,61 +1,43 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-// Updated for new Input System.
-// Attach to the Main Camera GameObject.
-// BouncyShoot.LateUpdate() decides when to call updateMouseOrbit / rotateLeft / rotateRight.
-// This script contains no input handling of its own.
+// Simplified orbit using RotateAround — no accumulated angle state that can go stale.
+// Attach to Main Camera. BouncyShoot.LateUpdate() calls these methods directly.
 
-[AddComponentMenu("Camera-Control/Mouse Orbit with zoom")]
+[AddComponentMenu("Camera-Control/Mouse Orbit")]
 public class DragMouseOrbit : MonoBehaviour
 {
-    public float xSpeed = 120.0f;
-    public float ySpeed = 120.0f;
-
-    private float x = 0.0f;
-    private float y = 0.0f;
-
-    void Start()
-    {
-        Vector3 angles = transform.eulerAngles;
-        x = angles.y;
-        y = angles.x;
-    }
+    public float xSpeed = 0.2f; // degrees of orbit per pixel of mouse movement
+    public float ySpeed = 0.2f;
+    public float arrowSpeed = 2f; // degrees per frame for arrow key orbit
 
     // Called by BouncyShoot when right mouse + shift is held
-    public void updateMouseOrbit(float distance, Vector3 target)
+    public void updateMouseOrbit(Vector3 target)
     {
         Vector2 delta = Mouse.current.delta.ReadValue();
-        x += delta.x * xSpeed * (distance / 10)  * 0.002f;
-        y -= delta.y * ySpeed * (distance / 50) * 0.002f;
+        if (delta == Vector2.zero) return;
 
-        Quaternion rotation = Quaternion.Euler(y, x, 0);
-        transform.rotation = rotation;
-        transform.position = rotation * new Vector3(0f, 0f, -distance) + target;
+        // Horizontal: orbit around world Y axis
+        transform.RotateAround(target, Vector3.up, delta.x * xSpeed);
+
+        // Vertical: orbit around camera's local right axis
+        transform.RotateAround(target, transform.right, -delta.y * ySpeed);
+
+        // Always keep looking at the target
+        transform.LookAt(target);
     }
 
     // Called by BouncyShoot when left arrow is held
-    public void rotateLeft(float distance, Vector3 target)
+    public void rotateLeft(Vector3 target)
     {
-        x -= 0.1f;
-        Quaternion rotation = Quaternion.Euler(y, x, 0);
-        transform.position = rotation * new Vector3(0f, 0f, -distance) + target;
+        transform.RotateAround(target, Vector3.up, -arrowSpeed);
         transform.LookAt(target);
     }
 
     // Called by BouncyShoot when right arrow is held
-    public void rotateRight(float distance, Vector3 target)
+    public void rotateRight(Vector3 target)
     {
-        x += 0.1f;
-        Quaternion rotation = Quaternion.Euler(y, x, 0);
-        transform.position = rotation * new Vector3(0f, 0f, -distance) + target;
+        transform.RotateAround(target, Vector3.up, arrowSpeed);
         transform.LookAt(target);
-    }
-
-    public static float ClampAngle(float angle, float min, float max)
-    {
-        if (angle < -360F) angle += 360F;
-        if (angle >  360F) angle -= 360F;
-        return Mathf.Clamp(angle, min, max);
     }
 }

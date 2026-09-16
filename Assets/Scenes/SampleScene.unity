@@ -424,6 +424,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1e786a585355f40f986b4b937072e207, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  xSpeed: 2
+  ySpeed: 2
+  arrowSpeed: 2
 --- !u!114 &330585550
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -436,6 +439,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 10498a96c09d0413991c4cc46e11a276, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  mouseSensitivity: 50
 --- !u!114 &330585551
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -628,6 +632,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3e2131268742e4b9fb1653da833ce7a5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  extraCams: []
+  camSetting: 0
 --- !u!4 &589898582
 Transform:
   m_ObjectHideFlags: 0
@@ -1730,15 +1736,17 @@ MonoBehaviour:
   BallInstYesPrefab: {fileID: 6954357075162129829, guid: 93660fdca8c7d4698a2fc0e5a504c515, type: 3}
   BallInstNoPrefab: {fileID: 7418650961480592526, guid: d9f48e292ca3d45cdaf09d220e8a4158, type: 3}
   spherePrefab: {fileID: 6954357075162129829, guid: 93660fdca8c7d4698a2fc0e5a504c515, type: 3}
-  testImage: {fileID: 2800000, guid: b5f3e0b44360d4d0294054d31204d899, type: 3}
   ballPrefabs:
   - {fileID: 6954357075162129829, guid: 93660fdca8c7d4698a2fc0e5a504c515, type: 3}
-  mousePos: {x: 0, y: 0, z: 0}
-  camera: {fileID: 0}
-  spaceMult: 0.008
-  spaceAccel: 0.4
   ballDefaultMat: {fileID: 2100000, guid: 99d3c3dd231d14731b573c2fbfee5c7d, type: 2}
   ballTransparentMat: {fileID: 2100000, guid: 48a0ea85513044b5ab914e6ee8a04828, type: 2}
+  camera: {fileID: 330585545}
+  dragMouseOrbitRef: {fileID: 330585549}
+  mouseLookRef: {fileID: 330585550}
+  camTarget: {fileID: 0}
+  cameraManager: {fileID: 589898581}
+  spaceMult: 0.008
+  spaceAccel: 0.4
 --- !u!114 &1937872481
 MonoBehaviour:
   m_ObjectHideFlags: 0

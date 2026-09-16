@@ -9,94 +9,102 @@ using UnityEngine.InputSystem;
 
 public class BouncyShoot : MonoBehaviour
 {
+    // -------------------------------------------------------------------------
+    // STATIC STATE
+    // -------------------------------------------------------------------------
     public static readonly Color colorZero = Color.clear;
     public static List<BallClass> balls;
     public static Dictionary<GameObject, List<BallClass>> parentObjects;
 
-    public GameObject BallInstYesPrefab;
-    public GameObject BallInstNoPrefab;
-    public GameObject spherePrefab;
-    public List<GameObject> ballPrefabs;
+    // -------------------------------------------------------------------------
+    // INSPECTOR FIELDS
+    // -------------------------------------------------------------------------
+    [Header("Ball Prefabs")]
+    public GameObject BallInstYesPrefab;   // GPU-instanced, no per-ball color
+    public GameObject BallInstNoPrefab;    // non-instanced, supports per-ball color
+    public GameObject spherePrefab;        // assigned to BallInstYesPrefab on Start
+    public List<GameObject> ballPrefabs;   // H key cycles through these
 
-    public Vector3 mousePos;
+    [Header("Materials")]
+    public Material ballDefaultMat;        // shared material for instanced balls
+    public Material ballTransparentMat;    // shared material for colored balls
+
+    [Header("Camera")]
     public Camera camera;
+    public DragMouseOrbit dragMouseOrbitRef;
+    public MouseLook mouseLookRef;
+    public GameObject camTarget;           // orbit target; null = orbits origin
+    public CameraManager cameraManager;
 
-    private bool ballOnCool;
+    [Header("Tuning")]
     public float spaceMult  = 0.008f;
     public float spaceAccel = 0.4f;
 
-    public Material ballDefaultMat;
-    public Material ballTransparentMat;
+    // -------------------------------------------------------------------------
+    // PRIVATE
+    // -------------------------------------------------------------------------
+    private bool ballOnCool;
+    private int  cameraSetting = 0;
+    private GeometryLaunchManager geometryLaunchManager;
+    private Gatling gatling;
 
+    // Auto-detects URP vs Built-in pipeline for correct material property names
     private string colorPropName =>
         UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline != null
             ? "_BaseColor" : "_Color";
-
     private string smoothnessPropName =>
         UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline != null
             ? "_Smoothness" : "_Glossiness";
 
-    private GeometryLaunchManager geometryLaunchManager;
-    private Gatling gatling;
-
-    // [STEP 8] Camera control references
-    // DragMouseOrbit and MouseLook should be components on the Main Camera GameObject
-    public DragMouseOrbit dragMouseOrbitRef;
-    public MouseLook mouseLookRef;
-    public GameObject camTarget; // optional — orbit target; null = orbits around origin
-    private CameraManager cameraManager;
-    private int cameraSetting = 0;
-
-    // -------------------------------------------------------------------------
+    // =========================================================================
     // LIFECYCLE
-    // -------------------------------------------------------------------------
+    // =========================================================================
 
     void Start()
     {
-        balls = new List<BallClass>();
-        BallInstYesPrefab = spherePrefab;
-        camera = GameObject.Find("Main Camera").GetComponent<Camera>();
+        balls         = new List<BallClass>();
         parentObjects = new Dictionary<GameObject, List<BallClass>>();
 
+        BallInstYesPrefab = spherePrefab;
+
         geometryLaunchManager = GetComponent<GeometryLaunchManager>();
-        gatling = GetComponent<Gatling>();
+        gatling               = GetComponent<Gatling>();
 
         GeometryLaunchManager.bouncyShootRef = this;
         ImageCreater.bouncyShootRef          = this;
         MeshVertManager.bouncyShootRef       = this;
         if (gatling != null) gatling.bouncyShootRef = this;
 
-        // [STEP 8] Wire camera components — both scripts live on the Main Camera
-        mouseLookRef      = camera.GetComponent<MouseLook>();
-        dragMouseOrbitRef = camera.GetComponent<DragMouseOrbit>();
-
-        // CameraManager lives on a separate GameObject; null-safe if not yet set up
-        cameraManager = FindFirstObjectByType<CameraManager>();
-
+        // Default ball color: light gray
         Static.ballColorR = 190;
         Static.ballColorG = 190;
         Static.ballColorB = 190;
         updateBallColor();
+
+        Debug.Log($"[BouncyShoot] MouseLook={mouseLookRef != null}, " +
+                  $"DragMouseOrbit={dragMouseOrbitRef != null}, " +
+                  $"Camera={camera != null}, " +
+                  $"CameraManager={cameraManager != null}");
     }
 
-    // -------------------------------------------------------------------------
-    // UPDATE
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // UPDATE — input & spawning
+    // =========================================================================
 
     void Update()
     {
-        // -- Aim at mouse --
-        Vector2 mouseScreenPos = Mouse.current.position.ReadValue();
-        Vector3 mouseWorldPos = camera.ScreenToWorldPoint(
+        // -- Aim shooter at mouse --
+        Vector2 mouseScreenPos  = Mouse.current.position.ReadValue();
+        Vector3 mouseWorldPos   = camera.ScreenToWorldPoint(
             new Vector3(mouseScreenPos.x, mouseScreenPos.y, 1f));
         transform.LookAt(mouseWorldPos);
 
-        // -- Fire (held) --
+        // -- F (held): fire single ball on cooldown --
         if (Keyboard.current.fKey.isPressed)
             if (!ballOnCool)
                 StartCoroutine(ballCD(Static.ballCoolTime));
 
-        // -- Grid --
+        // -- G: spawn grid --
         if (Keyboard.current.gKey.wasPressedThisFrame)
         {
             GameObject matrixParent = new GameObject("matrixParent");
@@ -118,7 +126,7 @@ public class BouncyShoot : MonoBehaviour
                 ball.relativePosToCenter = ball.ball.transform.position - mid;
         }
 
-        // -- Destroy all balls --
+        // -- T: destroy all balls --
         if (Keyboard.current.tKey.wasPressedThisFrame)
         {
             foreach (BallClass bs in balls)
@@ -130,33 +138,34 @@ public class BouncyShoot : MonoBehaviour
             balls.Clear();
         }
 
-        // -- Spark away --
+        // -- K: spark away --
         if (Keyboard.current.kKey.wasPressedThisFrame)
             sparkAway();
 
-        // -- Reload scene --
+        // -- R: reload scene --
         if (Keyboard.current.rKey.wasPressedThisFrame)
             SceneManager.LoadScene(0);
 
-        // -- Pause / unpause --
+        // -- Semicolon: pause / unpause --
         if (Keyboard.current.semicolonKey.wasPressedThisFrame)
         {
             Static.timeStep = Static.timeStep != 0 ? 0 : 0.7f;
             Time.timeScale  = Static.timeStep;
         }
 
-        // -- Toggle gMult --
+        // -- U / Y: toggle gravity multiplier --
         if (Keyboard.current.uKey.wasPressedThisFrame)
             Static.gMult = Static.gMult != 0 ? 0 : 30f;
         if (Keyboard.current.yKey.wasPressedThisFrame)
             Static.gMult = Static.gMult != 0 ? 0 : 500f;
 
-        // -- Toggle near clip plane --
+        // -- Z: toggle near clip plane (clip inside ball clusters) --
         if (Keyboard.current.zKey.wasPressedThisFrame)
             camera.nearClipPlane = camera.nearClipPlane == .3f ? 99999f : .3f;
 
-        // -- Color presets (Shift + number) --
-        bool shift = Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed;
+        // -- Shift + 1-6: color presets --
+        bool shift = Keyboard.current.leftShiftKey.isPressed
+                  || Keyboard.current.rightShiftKey.isPressed;
         if (shift)
         {
             if (Keyboard.current.digit1Key.wasPressedThisFrame) { Static.ballColorR=190; Static.ballColorG=190; Static.ballColorB=190; updateBallColor(); }
@@ -175,7 +184,7 @@ public class BouncyShoot : MonoBehaviour
                 BallInstYesPrefab = ballPrefabs[Static.currentBallShape % ballPrefabs.Count];
         }
 
-        // -- S: circle --
+        // -- S: fire circle --
         if (Keyboard.current.sKey.wasPressedThisFrame)
         {
             GameObject parent = new GameObject("circleParent");
@@ -187,7 +196,7 @@ public class BouncyShoot : MonoBehaviour
                 ball.relativePosToCenter = ball.ball.transform.position - mid;
         }
 
-        // -- A: double cone --
+        // -- A: fire double cone (spawns over ~2 seconds via coroutine) --
         if (Keyboard.current.aKey.wasPressedThisFrame && geometryLaunchManager != null)
         {
             GameObject parent = new GameObject("doubleConeParent");
@@ -196,7 +205,7 @@ public class BouncyShoot : MonoBehaviour
             rotateParent(parent, transform.rotation);
         }
 
-        // -- D: vert model --
+        // -- D: fire vert model --
         if (Keyboard.current.dKey.wasPressedThisFrame)
         {
             if (MeshVertManager.vertModelDict != null && MeshVertManager.vertModelDict.Count > 0)
@@ -210,26 +219,27 @@ public class BouncyShoot : MonoBehaviour
                     ball.relativePosToCenter = ball.ball.transform.position - mid;
             }
             else
-                Debug.LogWarning("D key: no vert models loaded. Add prefabs to Assets/Resources/VertModels.");
+                Debug.LogWarning("D key: no vert models loaded — add prefabs to Assets/Resources/VertModels.");
         }
 
-        // -- I: image --
+        // -- I: fire image --
         if (Keyboard.current.iKey.wasPressedThisFrame)
         {
             if (Static.currentImage != null && Static.imageDivideBy != 0)
             {
                 GameObject parent = new GameObject("imageParent");
                 parent.transform.position = transform.position;
-                parentObjects[parent] = ImageCreater.fireImage(Static.currentImage, Static.imageDivideBy, parent);
+                parentObjects[parent] = ImageCreater.fireImage(
+                    Static.currentImage, Static.imageDivideBy, parent);
                 Vector3 mid = calculateMidPoint(parentObjects[parent]);
                 foreach (BallClass ball in parentObjects[parent])
                     ball.relativePosToCenter = ball.ball.transform.position - mid;
             }
             else
-                Debug.LogWarning("I key: Static.currentImage is null. Assign a Texture2D to Static.currentImage.");
+                Debug.LogWarning("I key: Static.currentImage is null — assign a Texture2D first.");
         }
 
-        // -- B: gatling (hold) --
+        // -- B (hold): gatling gun --
         if (Keyboard.current.bKey.wasPressedThisFrame && gatling != null)
         {
             gatling.firingOn(0f,   true);
@@ -244,9 +254,9 @@ public class BouncyShoot : MonoBehaviour
             gatling.firingCircleToggle();
     }
 
-    // -------------------------------------------------------------------------
-    // FIXED UPDATE
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // FIXED UPDATE — continuous forces
+    // =========================================================================
 
     void FixedUpdate()
     {
@@ -256,25 +266,24 @@ public class BouncyShoot : MonoBehaviour
 
         addBallForces();
 
+        // Remove parent groups that have run out of balls
         for (int i = parentObjects.Count - 1; i > -1; i--)
             if (parentObjects.ElementAt(i).Value.Count == 0)
                 parentObjects.Remove(parentObjects.ElementAt(i).Key);
     }
 
-    // -------------------------------------------------------------------------
-    // LATE UPDATE — camera controls                                   [STEP 8]
-    // -------------------------------------------------------------------------
+    // =========================================================================
+    // LATE UPDATE — camera controls
+    // =========================================================================
 
     void LateUpdate()
     {
-        // Reset look orientation when shift is pressed/released so there's
-        // no jump when switching between orbit and free-look modes
-        if (Keyboard.current.leftShiftKey.wasPressedThisFrame)
-            mouseLookRef?.setRotationToCurrent();
-        if (Keyboard.current.leftShiftKey.wasReleasedThisFrame)
+        // Sync MouseLook orientation when switching modes so there's no jump
+        if (Keyboard.current.leftShiftKey.wasPressedThisFrame ||
+            Keyboard.current.leftShiftKey.wasReleasedThisFrame)
             mouseLookRef?.setRotationToCurrent();
 
-        // Arrow keys: up/down zoom, left/right orbit
+        // Up/Down arrows: zoom
         if (Keyboard.current.upArrowKey.isPressed)
         {
             camera.gameObject.transform.position *= .997f;
@@ -286,28 +295,32 @@ public class BouncyShoot : MonoBehaviour
             cameraManager?.zoom(1.003f);
         }
 
+        // Orbit target (null = world origin)
         Vector3 targetPos = camTarget ? camTarget.transform.position : Vector3.zero;
-        float dist = Vector3.Distance(camera.gameObject.transform.position, targetPos);
 
+        // Left/Right arrows: orbit rotate
         if (Keyboard.current.leftArrowKey.isPressed)
-            dragMouseOrbitRef?.rotateLeft(dist, targetPos);
+            dragMouseOrbitRef?.rotateLeft(targetPos);
         if (Keyboard.current.rightArrowKey.isPressed)
-            dragMouseOrbitRef?.rotateRight(dist, targetPos);
+            dragMouseOrbitRef?.rotateRight(targetPos);
 
-        // Right mouse button: reset look on press, then orbit (shift) or free-look
+        // Right mouse: sync look on first press, then orbit (shift) or free-look
         if (Mouse.current.rightButton.wasPressedThisFrame)
             mouseLookRef?.setRotationToCurrent();
 
         if (Mouse.current.rightButton.isPressed)
         {
-            if (Keyboard.current.leftShiftKey.isPressed)
-                dragMouseOrbitRef?.updateMouseOrbit(dist, targetPos);
+            bool shiftHeld = Keyboard.current.leftShiftKey.isPressed
+                          || Keyboard.current.rightShiftKey.isPressed;
+            if (shiftHeld)
+                dragMouseOrbitRef?.updateMouseOrbit(targetPos);
             else
                 mouseLookRef?.updateMouseLook();
         }
 
-        // Scroll wheel zoom
+        // Scroll wheel: zoom
         float scroll = Mouse.current.scroll.ReadValue().y;
+        float dist   = Vector3.Distance(camera.gameObject.transform.position, targetPos);
         if (scroll > 0f && dist > 1f)
         {
             camera.gameObject.transform.position *= .99f;
@@ -319,12 +332,12 @@ public class BouncyShoot : MonoBehaviour
             cameraManager?.zoom(1.01f);
         }
 
-        // C key — toggle color cycling on all balls
+        // C: toggle color cycling on all balls
         if (Keyboard.current.cKey.wasPressedThisFrame)
             foreach (BallClass bC in balls)
                 bC.bS.colorChangeToggle();
 
-        // Quote key — cycle extra camera modes (only if CameraManager is set up)
+        // Quote: cycle extra camera modes
         if (Keyboard.current.quoteKey.wasPressedThisFrame && cameraManager != null)
         {
             cameraSetting++;
@@ -332,17 +345,19 @@ public class BouncyShoot : MonoBehaviour
         }
     }
 
-    // -------------------------------------------------------------------------
+    // =========================================================================
     // BALL SPAWNING
-    // -------------------------------------------------------------------------
+    // =========================================================================
 
     public BallClass ballFire(GameObject shootingObj, Vector3 addedVect, Color color)
     {
         GameObject newBall;
         if (color == Color.clear || color == colorZero || color == Color.black)
-            newBall = Instantiate(BallInstYesPrefab, shootingObj.transform.position + addedVect, Quaternion.identity);
+            newBall = Instantiate(BallInstYesPrefab,
+                shootingObj.transform.position + addedVect, Quaternion.identity);
         else
-            newBall = Instantiate(BallInstNoPrefab, shootingObj.transform.position + addedVect, Quaternion.identity);
+            newBall = Instantiate(BallInstNoPrefab,
+                shootingObj.transform.position + addedVect, Quaternion.identity);
 
         BallClass ballClass = new BallClass();
         ballClass.ball = newBall;
@@ -375,9 +390,9 @@ public class BouncyShoot : MonoBehaviour
         ballOnCool = false;
     }
 
-    // -------------------------------------------------------------------------
+    // =========================================================================
     // FORCES
-    // -------------------------------------------------------------------------
+    // =========================================================================
 
     public void addBallForces()
     {
@@ -405,13 +420,18 @@ public class BouncyShoot : MonoBehaviour
         Vector3 midPoint = calculateMidPoint(balls);
         foreach (BallClass bStruct in balls)
         {
-            Vector3 directionToAdd = (bStruct.relativeStartPos - (bStruct.ball.transform.position - midPoint));
+            Vector3 directionToAdd = bStruct.relativeStartPos -
+                                     (bStruct.ball.transform.position - midPoint);
             if (Vector3.Distance(bStruct.ball.transform.position, midPoint) > .2f)
             {
-                Vector3 shouldVelocity = 3 * directionToAdd.normalized * Mathf.Pow(directionToAdd.magnitude, .4f);
-                Vector3 forceAdded = spaceMult * 5 * ((shouldVelocity - bStruct.rB.linearVelocity).normalized *
-                                      Mathf.Pow(Vector3.Distance(shouldVelocity, bStruct.rB.linearVelocity), 2) /
-                                      Mathf.Pow(Mathf.Clamp(Vector3.Distance(midPoint, transform.position), .3f, 5000), 1 / 3));
+                Vector3 shouldVelocity = 3 * directionToAdd.normalized *
+                    Mathf.Pow(directionToAdd.magnitude, .4f);
+                // Note: 1/3 is integer division (= 0), Pow term = 1 — matches original
+                Vector3 forceAdded = spaceMult * 5 *
+                    ((shouldVelocity - bStruct.rB.linearVelocity).normalized *
+                     Mathf.Pow(Vector3.Distance(shouldVelocity, bStruct.rB.linearVelocity), 2) /
+                     Mathf.Pow(Mathf.Clamp(
+                         Vector3.Distance(midPoint, transform.position), .3f, 5000), 1 / 3));
                 bStruct.totalForceToAdd += forceAdded;
             }
         }
@@ -423,27 +443,37 @@ public class BouncyShoot : MonoBehaviour
         {
             List<BallClass> group = parentObjects[parent];
             if (group.Count == 0) continue;
-            Vector3 midPoint = calculateMidPoint(group);
-            BallClass bc = group[0];
+
+            Vector3 midPoint    = calculateMidPoint(group);
+            BallClass bc        = group[0];
             Vector3 originalVect = bc.relativePosToCenter;
             Vector3 currentVect  = bc.ball.transform.position - midPoint;
             if (originalVect == Vector3.zero || currentVect == Vector3.zero) continue;
+
             Quaternion q1 = Quaternion.LookRotation(originalVect);
             Quaternion q2 = Quaternion.LookRotation(currentVect);
             Quaternion q3 = Quaternion.Inverse(q1) * q2;
+
             foreach (BallClass bStruct in group)
             {
                 Vector3 relativeStartWithBallSep = new Vector3(
                     bStruct.relativeStartPos.x * Static.ballSeperatness,
                     bStruct.relativeStartPos.y * Static.ballSeperatness,
                     bStruct.relativeStartPos.z * Static.ballSeperatness);
-                Vector3 directionToAdd = (q3 * relativeStartWithBallSep) - (bStruct.ball.transform.position - midPoint);
+
+                Vector3 directionToAdd = (q3 * relativeStartWithBallSep) -
+                                         (bStruct.ball.transform.position - midPoint);
+
                 if (Vector3.Distance(bStruct.ball.transform.position, midPoint) > .01f)
                 {
-                    Vector3 shouldVelocity = 5 * directionToAdd.normalized * Mathf.Pow(directionToAdd.magnitude, spaceAccel);
-                    Vector3 forceAdded = spaceMult * ((shouldVelocity - bStruct.rB.linearVelocity).normalized *
-                                          Mathf.Pow(Vector3.Distance(shouldVelocity, bStruct.rB.linearVelocity), 2) /
-                                          Mathf.Pow(Mathf.Clamp(Vector3.Distance(midPoint, transform.position), .3f, 500), 1 / 3));
+                    Vector3 shouldVelocity = 5 * directionToAdd.normalized *
+                        Mathf.Pow(directionToAdd.magnitude, spaceAccel);
+                    // Note: 1/3 integer division = 0, Pow term = 1 — matches original
+                    Vector3 forceAdded = spaceMult *
+                        ((shouldVelocity - bStruct.rB.linearVelocity).normalized *
+                         Mathf.Pow(Vector3.Distance(shouldVelocity, bStruct.rB.linearVelocity), 2) /
+                         Mathf.Pow(Mathf.Clamp(
+                             Vector3.Distance(midPoint, transform.position), .3f, 500), 1 / 3));
                     if (forceAdded.magnitude > 3000)
                         forceAdded = forceAdded.normalized * 3000;
                     bStruct.totalForceToAdd += forceAdded;
@@ -452,9 +482,9 @@ public class BouncyShoot : MonoBehaviour
         }
     }
 
-    // -------------------------------------------------------------------------
+    // =========================================================================
     // COLOR & MATERIAL
-    // -------------------------------------------------------------------------
+    // =========================================================================
 
     public void updateBallColor()
     {
@@ -486,9 +516,9 @@ public class BouncyShoot : MonoBehaviour
         if (ballTransparentMat) ballTransparentMat.SetFloat(smoothnessPropName, v);
     }
 
-    // -------------------------------------------------------------------------
+    // =========================================================================
     // UTILITIES
-    // -------------------------------------------------------------------------
+    // =========================================================================
 
     public void rotateParent(GameObject parent, Quaternion rotation)
     {
