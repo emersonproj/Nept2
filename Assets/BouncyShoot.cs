@@ -35,6 +35,7 @@ public class BouncyShoot : MonoBehaviour
     public MouseLook mouseLookRef;
     public GameObject camTarget;           // orbit target; null = orbits origin
     public CameraManager cameraManager;
+    
 
     [Header("Tuning")]
     public float spaceMult  = 0.008f;
@@ -81,10 +82,8 @@ public class BouncyShoot : MonoBehaviour
         Static.ballColorB = 190;
         updateBallColor();
 
-        Debug.Log($"[BouncyShoot] MouseLook={mouseLookRef != null}, " +
-                  $"DragMouseOrbit={dragMouseOrbitRef != null}, " +
-                  $"Camera={camera != null}, " +
-                  $"CameraManager={cameraManager != null}");
+        ModelManager.bouncyShootRef = this;
+
     }
 
     // =========================================================================
@@ -252,6 +251,35 @@ public class BouncyShoot : MonoBehaviour
         // -- M: circle gatling toggle --
         if (Keyboard.current.mKey.wasPressedThisFrame && gatling != null)
             gatling.firingCircleToggle();
+
+            // L — fire current shape
+        if (Keyboard.current.lKey.wasPressedThisFrame)
+        {
+            if (ModelManager.shapeDict != null && ModelManager.shapeDict.Count > 0)
+            {
+                GameObject parent = new GameObject("shapeParent");
+                parent.transform.position = transform.position;
+                parentObjects[parent] = ModelManager.fireShape(parent);
+                rotateParent(parent, transform.rotation);
+                Vector3 mid = calculateMidPoint(parentObjects[parent]);
+                foreach (BallClass ball in parentObjects[parent])
+                    ball.relativePosToCenter = ball.ball.transform.position - mid;
+                Debug.Log($"Fired shape: {ModelManager.currentShapeName()}");
+            }
+        }
+
+        // Comma / Period — cycle through shapes
+        if (Keyboard.current.commaKey.wasPressedThisFrame && ModelManager.shapeNames != null)
+        {
+            Static.modelIndex--;
+            if (Static.modelIndex < 0) Static.modelIndex = ModelManager.shapeNames.Length - 1;
+            Debug.Log($"Shape: {ModelManager.currentShapeName()}");
+        }
+        if (Keyboard.current.periodKey.wasPressedThisFrame && ModelManager.shapeNames != null)
+        {
+            Static.modelIndex = (Static.modelIndex + 1) % ModelManager.shapeNames.Length;
+            Debug.Log($"Shape: {ModelManager.currentShapeName()}");
+        }
     }
 
     // =========================================================================

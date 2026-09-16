@@ -349,7 +349,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1, z: -70.91}
+  m_LocalPosition: {x: 0, y: 1, z: -201.6}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -1250,7 +1250,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2f1b1b1ebad0641549dd784a4a96f33f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  bMass: 1000
   bExp: 1.2
 --- !u!135 &1580430434
 SphereCollider:
@@ -1698,6 +1697,7 @@ GameObject:
   - component: {fileID: 1937872483}
   - component: {fileID: 1937872482}
   - component: {fileID: 1937872481}
+  - component: {fileID: 1937872484}
   m_Layer: 0
   m_Name: BallManager
   m_TagString: Untagged
@@ -1785,6 +1785,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b96360e1038d44b53b15e54e99a86078, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+--- !u!114 &1937872484
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1937872478}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8802dae2a1b2145e581f1afdd519d6dc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ModelManager
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
