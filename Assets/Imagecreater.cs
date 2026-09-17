@@ -2,9 +2,8 @@ using System.Collections.Generic;
 using DefaultNamespace;
 using UnityEngine;
 
-// Drop-in from original — no changes needed.
-// Static.currentImage must be assigned (e.g. drag a Texture2D in via inspector or a loader script).
-// Static.imageDivideBy controls resolution (default 4 — every 4th pixel).
+// SETUP: Put PNG files in Assets/Resources/Images/
+// Each PNG must have Read/Write enabled in its import settings (Texture Import Settings -> Advanced).
 
 public static class ImageCreater
 {
@@ -15,18 +14,26 @@ public static class ImageCreater
         List<BallClass> newBalls = new List<BallClass>();
         Color[] pixels = image.GetPixels(0, 0, image.width, image.height);
 
-        for (int i = 0; i < image.width; i += divideSizeBy)
+        // Unity GetPixels() stores pixels in row-major order, bottom-left origin.
+        // Correct index for pixel at column x, row y is: y * image.width + x
+        // The original code used i * image.height + j which is wrong for non-square images
+        // and caused landscape images to only show the left half.
+
+        for (int x = 0; x < image.width; x += divideSizeBy)
         {
-            for (int j = 0; j < image.height; j += divideSizeBy)
+            for (int y = 0; y < image.height; y += divideSizeBy)
             {
-                Color color = pixels[(i * image.height) + j];
+                Color color = pixels[y * image.width + x];
+
                 if (color != Color.clear)
                 {
                     Vector3 addedVect = new Vector3(
-                        j / divideSizeBy - (image.width  / divideSizeBy) / 2,
-                        i / divideSizeBy - (image.height / divideSizeBy) / 2, 0);
+                        x / divideSizeBy - (image.width  / divideSizeBy) / 2f,
+                        y / divideSizeBy - (image.height / divideSizeBy) / 2f,
+                        0);
 
-                    BallClass ballS = bouncyShootRef.ballFire(bouncyShootRef.gameObject, addedVect, color);
+                    BallClass ballS = bouncyShootRef.ballFire(
+                        bouncyShootRef.gameObject, addedVect, color);
                     ballS.ball.transform.parent = imgParent.transform;
                     newBalls.Add(ballS);
                 }
