@@ -25,7 +25,8 @@ public class BlackHole : MonoBehaviour
             Vector3 direction = transform.position - ballClass.ball.transform.position;
             float dist = Mathf.Max(direction.magnitude, 0.1f);
 
-            ballClass.totalForceToAdd += direction.normalized * (Static.gMult / Mathf.Pow(dist, bExp));
+            ballClass.totalForceToAdd +=
+                direction.normalized * (Static.gMult / Mathf.Pow(dist, Static.gExp));
         }
     }
 }
