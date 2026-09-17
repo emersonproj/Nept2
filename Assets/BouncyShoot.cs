@@ -96,6 +96,15 @@ public class BouncyShoot : MonoBehaviour
 
     void Update()
     {
+        // E — reset camera to default position
+        if (Keyboard.current.eKey.wasPressedThisFrame)
+        {
+            camera.gameObject.transform.position = new Vector3(0, 0, -100);
+            camera.gameObject.transform.LookAt(Vector3.zero);
+            cameraManager?.setCurrentZoom(-100);
+            cameraSetting = 0;
+            cameraManager?.switchCam(0);
+        }
         // -- Aim shooter at mouse --
         Vector2 mouseScreenPos  = Mouse.current.position.ReadValue();
         Vector3 mouseWorldPos   = camera.ScreenToWorldPoint(

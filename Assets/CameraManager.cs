@@ -2,11 +2,16 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-// Drop-in from original — no changes needed.
-// SETUP: Attach this to a GameObject called "ExtraCams".
-// Add child GameObjects to it, each with a Camera component.
-// The more child cameras you have, the more camera mode variety you get.
-// 128 child cameras covers all modes; fewer is fine, unused modes just show nothing extra.
+// SETUP:
+//   1. Create an empty GameObject called "ExtraCams" and add this script to it
+//   2. Add 32 child GameObjects under it, each with a Camera component
+//   3. On each child camera's Universal Additional Camera Data, set Render Type to Overlay
+//   4. On your Main Camera's Universal Additional Camera Data, add all 32 to the Camera Stack
+//   5. Leave them all disabled — allReset() handles that on startup
+//
+// Keys (in BouncyShoot):
+//   Quote (') — cycle camera modes
+//   E          — reset camera to origin
 
 public class CameraManager : MonoBehaviour
 {
@@ -17,11 +22,18 @@ public class CameraManager : MonoBehaviour
     public static readonly float INITIALZOOM = -50;
     private float currentZoom = -100;
 
+    // -------------------------------------------------------------------------
+
     void Start()
     {
-        extraCams = GetComponentsInChildren<Camera>();
+        extraCams = GetComponentsInChildren<Camera>(true);
+        Debug.Log($"[CameraManager] Found {extraCams.Length} child cameras.");
         allReset();
     }
+
+    // -------------------------------------------------------------------------
+    // CAMERA MODES
+    // -------------------------------------------------------------------------
 
     public void switchCam(int camSettingGiven)
     {
@@ -31,44 +43,41 @@ public class CameraManager : MonoBehaviour
         List<Camera> cams;
         switch (camSetting)
         {
-            case 0: break;
-            case 1:  rotateOtherCams(.7f, 2, circleAroundCenter(2, 50)); break;
-            case 2:  rotateOtherCams(.6f, 2, camerasBetweenZPoints(-150, -250, 12)); break;
+            case 0:  break;
+            case 1:  rotateOtherCams(.07f,  2,  circleAroundCenter(2,  50));            break;
+            case 2:  rotateOtherCams(.06f,  2,  camerasBetweenZPoints(-150, -250, 12)); break;
             case 3:
-                for (int i = 0; i < 3; i++)
-                    for (int j = 0; j < 4; j++)
-                    {
-                        int idx = i * 4 + j;
-                        if (idx >= extraCams.Length) break;
-                        extraCams[idx].enabled = true;
-                        extraCams[idx].gameObject.transform.position = new Vector3(0, 0, currentZoom - (i * 30));
-                        extraCams[idx].gameObject.transform.rotation = Quaternion.Euler(0, 0, j * 90);
-                    }
+                int count3 = Mathf.Min(12, extraCams.Length);
+                for (int i = 0; i < count3; i++)
+                {
+                    extraCams[i].enabled = true;
+                    extraCams[i].transform.position = new Vector3(0, 0, currentZoom - ((i / 4) * 30));
+                    extraCams[i].transform.rotation = Quaternion.Euler(0, 0, (i % 4) * 90);
+                }
                 break;
-            case 4:  rotateOtherCams(.1f,  4,  zRotateAroundCenter(8));  break;
-            case 5:  circleAroundCenter(8,  currentZoom * 1.5f);         break;
-            case 6:  circleAroundCenter(15, currentZoom * 2);            break;
-            case 7:  zRotateAroundCenter(8);                             break;
-            case 8:  rotateOtherCams(.7f,  8,  zRotateAroundCenter(9));  break;
-            case 9:  rotateHalfCams(.5f,   9,  zRotateAroundCenter(9));  break;
-            case 10: zRotateAroundCenter(11);                            break;
+            case 4:  rotateOtherCams(.01f,  4,  zRotateAroundCenter(8));               break;
+            case 5:  circleAroundCenter(8,  currentZoom * 1.5f);                      break;
+            case 6:  circleAroundCenter(15, currentZoom * 2);                         break;
+            case 7:  zRotateAroundCenter(8);                                          break;
+            case 8:  rotateOtherCams(.07f,  8,  zRotateAroundCenter(9));               break;
+            case 9:  rotateHalfCams(.05f,   9,  zRotateAroundCenter(9));               break;
+            case 10: zRotateAroundCenter(11);                                         break;
             case 11:
                 cams = setupCamRange(0, 8);
                 incrementFoV(cams, currentZoom * .7f, currentZoom * 1.3f);
                 break;
-            case 12: rotateOtherCams(.1f,  12, zRotateAroundCenter(11)); break;
-            case 13: zRotateAroundCenter(16);                            break;
-            case 14: rotateHalfCams(.5f,   14, zRotateAroundCenter(15)); break;
-            case 15: rotateOtherCams(1f,   15, zRotateAroundCenter(17)); break;
-            case 16: zRotateAroundCenter(32);                            break;
-            case 17: zRotateAroundCenter(64);                            break;
-            case 18: zRotateAroundCenter(128);                           break;
+            case 12: rotateOtherCams(.01f,  12, zRotateAroundCenter(11));              break;
+            case 13: zRotateAroundCenter(16);                                         break;
+            case 14: rotateHalfCams(.05f,   14, zRotateAroundCenter(15));              break;
+            case 15: rotateOtherCams(.1f,   15, zRotateAroundCenter(17));              break;
+            case 16: zRotateAroundCenter(Mathf.Min(32, extraCams.Length));            break;
+            case 17: zRotateAroundCenter(Mathf.Min(32, extraCams.Length));            break;
+            case 18: zRotateAroundCenter(Mathf.Min(32, extraCams.Length));            break;
         }
 
-        int counter = 0;
-        foreach (Camera c in extraCams)
-            if (c.enabled) counter++;
-        Debug.Log($"[CameraManager] camSetting={camSetting}, cameras on: {counter}");
+        int on = 0;
+        foreach (Camera c in extraCams) if (c.enabled) on++;
+        Debug.Log($"[CameraManager] Mode {camSetting} — {on} cameras active.");
     }
 
     public void zoom(float zoomMult)
@@ -76,7 +85,7 @@ public class CameraManager : MonoBehaviour
         currentZoom *= zoomMult;
         if (camSetting != 500)
             foreach (Camera cam in extraCams)
-                cam.gameObject.transform.position *= zoomMult;
+                cam.transform.position *= zoomMult;
     }
 
     public void setCurrentZoom(float zoom)
@@ -84,14 +93,18 @@ public class CameraManager : MonoBehaviour
         currentZoom = zoom;
     }
 
+    // -------------------------------------------------------------------------
+    // UTILITIES
+    // -------------------------------------------------------------------------
+
     public void allReset()
     {
         foreach (Camera cam in extraCams)
         {
             cam.enabled = false;
             cam.fieldOfView = 60;
-            cam.gameObject.transform.rotation = Quaternion.Euler(Vector3.zero);
-            cam.gameObject.transform.position = new Vector3(0, 0, currentZoom);
+            cam.transform.rotation = Quaternion.Euler(Vector3.zero);
+            cam.transform.position  = new Vector3(0, 0, currentZoom);
             cam.nearClipPlane = .3f;
             cam.farClipPlane  = 20000;
         }
@@ -116,10 +129,8 @@ public class CameraManager : MonoBehaviour
         {
             cams.Add(extraCams[i]);
             extraCams[i].enabled = true;
-            extraCams[i].gameObject.transform.position =
-                new Vector3(0, 0, currentZoom);
-            extraCams[i].gameObject.transform.rotation =
-                Quaternion.Euler(0, 0, i * (360.0f / nOfCams));
+            extraCams[i].transform.position = new Vector3(0, 0, currentZoom);
+            extraCams[i].transform.rotation = Quaternion.Euler(0, 0, i * (360f / nOfCams));
         }
         return cams;
     }
@@ -127,13 +138,13 @@ public class CameraManager : MonoBehaviour
     public List<Camera> camerasBetweenZPoints(float z1, float z2, int nOfCams)
     {
         List<Camera> cams = new List<Camera>();
-        float increment = (z2 - z1) / nOfCams;
+        float inc = (z2 - z1) / nOfCams;
         int count = Mathf.Min(nOfCams, extraCams.Length);
         for (int i = 0; i < count; i++)
         {
             cams.Add(extraCams[i]);
             extraCams[i].enabled = true;
-            extraCams[i].gameObject.transform.position = new Vector3(0, 0, z1 + i * increment);
+            extraCams[i].transform.position = new Vector3(0, 0, z1 + i * inc);
         }
         return cams;
     }
@@ -141,48 +152,48 @@ public class CameraManager : MonoBehaviour
     public List<Camera> circleAroundCenter(int nOfCams, float distFromCenter)
     {
         List<Camera> cams = new List<Camera>();
-        float step = 2 * Mathf.PI / nOfCams;
-        int indexCounter = 0;
-        for (float theta = 0; theta < 2 * Mathf.PI && indexCounter < extraCams.Length; theta += step)
+        int count = Mathf.Min(nOfCams, extraCams.Length);
+        float step = count > 0 ? 2 * Mathf.PI / count : 0;
+        for (int i = 0; i < count; i++)
         {
-            float x = 0 - distFromCenter * Mathf.Cos(theta);
-            float z = 0 - distFromCenter * Mathf.Sin(theta);
-            cams.Add(extraCams[indexCounter]);
-            extraCams[indexCounter].enabled = true;
-            extraCams[indexCounter].gameObject.transform.position = new Vector3(x, 0, z);
-            extraCams[indexCounter].gameObject.transform.LookAt(Vector3.zero);
-            indexCounter++;
+            float theta = i * step;
+            extraCams[i].enabled = true;
+            extraCams[i].transform.position = new Vector3(
+                -distFromCenter * Mathf.Cos(theta), 0,
+                -distFromCenter * Mathf.Sin(theta));
+            extraCams[i].transform.LookAt(Vector3.zero);
+            cams.Add(extraCams[i]);
         }
         return cams;
     }
 
     public void incrementFoV(List<Camera> cams, float v1, float v2)
     {
-        float increment = (v2 - v1) / cams.Count;
+        float inc = cams.Count > 0 ? (v2 - v1) / cams.Count : 0;
         for (int i = 0; i < cams.Count; i++)
-            cams[i].fieldOfView = v1 + i * increment;
+            cams[i].fieldOfView = v1 + i * inc;
     }
 
     public IEnumerator camRotate(float roSpeed, int camSet, Camera cam)
     {
-        float currentZRotation = 0;
+        float rot = 0;
         while (camSetting == camSet)
         {
-            cam.gameObject.transform.rotation = Quaternion.Euler(0, 0, currentZRotation);
-            currentZRotation += roSpeed;
+            cam.transform.rotation = Quaternion.Euler(0, 0, rot);
+            rot += roSpeed;
             yield return null;
         }
     }
 
-    public void rotateHalfCams(float speed, int caseNumber, List<Camera> cams)
+    public void rotateHalfCams(float speed, int caseNum, List<Camera> cams)
     {
         for (int i = 0; i < cams.Count; i++)
-            StartCoroutine(camRotate(i < cams.Count / 2 ? speed : -speed, caseNumber, cams[i]));
+            StartCoroutine(camRotate(i < cams.Count / 2 ? speed : -speed, caseNum, cams[i]));
     }
 
-    public void rotateOtherCams(float speed, int caseNumber, List<Camera> cams)
+    public void rotateOtherCams(float speed, int caseNum, List<Camera> cams)
     {
         for (int i = 0; i < cams.Count; i++)
-            StartCoroutine(camRotate(i % 2 == 0 ? speed : -speed, caseNumber, cams[i]));
+            StartCoroutine(camRotate(i % 2 == 0 ? speed : -speed, caseNum, cams[i]));
     }
 }
