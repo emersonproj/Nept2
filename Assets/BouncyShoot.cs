@@ -35,6 +35,8 @@ public class BouncyShoot : MonoBehaviour
     public MouseLook mouseLookRef;
     public GameObject camTarget;           // orbit target; null = orbits origin
     public CameraManager cameraManager;
+
+    public Texture2D currentImage;
     
 
     [Header("Tuning")]
@@ -83,6 +85,8 @@ public class BouncyShoot : MonoBehaviour
         updateBallColor();
 
         ModelManager.bouncyShootRef = this;
+
+        Static.currentImage = currentImage;
 
     }
 
@@ -223,8 +227,9 @@ public class BouncyShoot : MonoBehaviour
 
         // -- I: fire image --
         if (Keyboard.current.iKey.wasPressedThisFrame)
-        {
-            if (Static.currentImage != null && Static.imageDivideBy != 0)
+{
+            if (ImageManager.images != null && ImageManager.images.Length > 0 
+                && Static.imageDivideBy != 0)
             {
                 GameObject parent = new GameObject("imageParent");
                 parent.transform.position = transform.position;
@@ -233,10 +238,17 @@ public class BouncyShoot : MonoBehaviour
                 Vector3 mid = calculateMidPoint(parentObjects[parent]);
                 foreach (BallClass ball in parentObjects[parent])
                     ball.relativePosToCenter = ball.ball.transform.position - mid;
+                Debug.Log($"Fired image: {ImageManager.currentImageName()}");
             }
             else
-                Debug.LogWarning("I key: Static.currentImage is null — assign a Texture2D first.");
+                Debug.LogWarning("I key: no images loaded — add PNGs to Assets/Resources/Images/");
         }
+
+        // [ / ] — cycle through images
+        if (Keyboard.current.leftBracketKey.wasPressedThisFrame)
+            ImageManager.cyclePrev();
+        if (Keyboard.current.rightBracketKey.wasPressedThisFrame)
+            ImageManager.cycleNext();
 
         // -- B (hold): gatling gun --
         if (Keyboard.current.bKey.wasPressedThisFrame && gatling != null)
